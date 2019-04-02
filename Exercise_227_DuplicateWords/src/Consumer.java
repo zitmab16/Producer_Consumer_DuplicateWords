@@ -1,6 +1,10 @@
 
 import Exception.EmptyException;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.util.HashMap;
+import ui.ThreadState;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -12,31 +16,50 @@ import java.util.HashMap;
  * @author vizug
  */
 public class Consumer extends Thread {
-
+    
     private Queue myQueue;
-
-    public Consumer(Queue myQueue) {
+    private ThreadState panel;
+    
+    public Consumer(Queue myQueue, ThreadState panel) {
         this.myQueue = myQueue;
+        this.panel = panel;
     }
-
+    
     @Override
     public void run() {
-        Book b = null;
-        synchronized (myQueue) {
-            try {
-                b = (Book) myQueue.pull();
-            } catch (EmptyException ex) {
-                System.out.println("Queue emtpy!");
+        panel.setToRun();
+        while (true) {
+            Book b = null;
+            HashMap<String, Integer> map = null;
+            synchronized (myQueue) {
                 try {
-                    myQueue.wait();
-                } catch (InterruptedException ex1) {
-
+                    b = (Book) myQueue.pull();
+                    myQueue.notifyAll();
+                } catch (EmptyException ex) {
+                    System.out.println("Queue emtpy!");
+                    try {
+                        panel.setToWait();
+                        myQueue.wait();
+                        panel.setToRun();
+                    } catch (InterruptedException ex1) {
+                        
+                    }
+                    continue;
                 }
             }
+            map = b.countWords();
+            File f = new File("output/" + b.getInputfilename() + "_output");
+            
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))) {
+                for (String str : map.keySet()) {
+                    if (str.matches("^[a-zA-Z0-9]+$")) {
+                        bw.write(String.format("%s: %d\n", str, map.get(str)));
+                    }
+                }
+            } catch (Exception ex) {
+            }
         }
-        HashMap map = b.countWords();
         
-        System.out.println(map.toString());
     }
-
+    
 }
